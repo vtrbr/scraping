@@ -1,0 +1,419 @@
+=====================================================
+1) BASE E PREFIXOS
+=====================================================
+BASE_URL = https://megafilmeshd1.com
+
+Streamings válidos (slug usado na URL):
+netflix | prime-video | disney-plus | apple-tv-plus | max | paramount-plus | globoplay | crunchyroll
+
+=====================================================
+2) MONTAGEM DA URL DE LISTAGEM
+=====================================================
+Com streaming:
+{BASE_URL}/streaming/{streaming}?tab={tab}[&page={n}][&sort={sort}]
+
+- tab  ∈ {series, filmes, doramas, novelas}
+- page ≥ 1 (omitir quando 1)
+- sort ∈ {recent, top, az, random} (omitir quando "recent")
+
+Sem streaming (direto por tipo/categoria):
+- {BASE_URL}/filmes | /series | /doramas | /novelas
+- {BASE_URL}/categoria/{slug_categoria}
+- Aceita também ?page={n}&sort={sort}
+
+=====================================================
+3) MONTAGEM DA URL DA PÁGINA DE DETALHE
+=====================================================
+O tipo do item define o prefixo:
+tab=series   -> "serie"   -> {BASE_URL}/serie/{slug}
+tab=filmes   -> "filme"   -> {BASE_URL}/filme/{slug}
+tab=doramas  -> "dorama"  -> {BASE_URL}/dorama/{slug}
+tab=novelas  -> "novela"  -> {BASE_URL}/novela/{slug}
+
+REGRA CRÍTICA:
+- Use SEMPRE o href exato do item no HTML (ele já vem no formato /{tipo}/{slug}).
+- Se o href não existir, gere o slug: minúsculas, sem acentos, espaços -> hífen, remover ' : / , . ! ?, manter [a-z0-9-].
+- Se o slug original já tiver sufixo de ano (-2026, -2006), mantenha. NÃO invente.
+
+=====================================================
+4) MONTAGEM DA URL DE IMAGEM
+=====================================================
+O src do <img> já vem como /poster-cache.php?s=w500&p={arquivo}
+- Card/listagem: {BASE_URL}/poster-cache.php?s=w500&p={arquivo}
+- Hero/banner:   {BASE_URL}/poster-cache.php?s=w1280&p={arquivo}
+
+Se src="" -> url_imagem = null. NUNCA invente caminho.
+
+=====================================================
+5) EXTRAÇÃO — DE ONDE PEGAR (ANTI-DUPLICIDADE)
+=====================================================
+A página repete o mesmo título em até 5 blocos:
+  A) Hero slider
+  B) Carrossel "Destaques"
+  C) Grid "Todos os X"          <-- FONTE OFICIAL
+  D) Sidebar "Top 10"
+  E) Rodapé "Top Novelas" (Top 10)
+
+Regra:
+- Extraia SOMENTE do bloco C) grid principal ("Todos os {tipo}" ou ".browse-grid .browse-card--index").
+- Se o grid não existir, use o hero (A) como fallback.
+- Deduplicar por url_pagina. Se o mesmo slug aparecer 2×, manter 1.
+
+=====================================================
+6) REGRAS DE DADOS (NÃO INVENTAR)
+=====================================================
+- nome       = título exato do HTML, decodificando entidades (&#039; -> ')
+- ano        = inteiro de 4 dígitos; ausente -> null
+- nota_tmdb  = converter vírgula para ponto (7,9 -> 7.9) e retornar NÚMERO; se 0,0 ou ausente -> null
+- tipo       = "filme" | "serie" | "dorama" | "novela" (singular, minúsculo, sem acento)
+- url_pagina = conforme seção 3
+- url_imagem = conforme seção 4 (ou null)
+
+Não retorne campos extras. Não retorne itens sem nome. Sem duplicatas.
+
+=====================================================
+7) FORMATO DE SAÍDA (OBRIGATÓRIO)
+=====================================================
+Responda APENAS com este objeto JSON, sem comentários, sem chaves adicionais:
+
+{
+  "meta": {
+    "base_url": "https://megafilmeshd1.com",
+    "streaming": "netflix",
+    "tipo_listagem": "novelas",
+    "url_listagem": "https://megafilmeshd1.com/streaming/netflix?tab=novelas",
+    "pagina": 1,
+    "ordenacao": "recent",
+    "total_retornado": 42,
+    "total_disponivel": 543
+  },
+  "itens": [
+    {
+      "nome": "Esmeralda",
+      "ano": 2004,
+      "nota_tmdb": 7.9,
+      "tipo": "novela",
+      "url_imagem": "https://megafilmeshd1.com/poster-cache.php?s=w500&p=sDclHQ6q5pgjMWYTDAYUEcD9Um2.jpg",
+      "url_pagina": "https://megafilmeshd1.com/novela/esmeralda-1"
+    }
+  ]
+}
+
+REGRAS FINAIS:
+- JSON válido (JSON.parse OK). Sem ```json, sem //, sem comentários.
+- Sempre com "meta" e "itens".
+- Vazio: {"meta":{...}, "itens": [], "total_retornado": 0}
+- streaming e tipo_listagem usam null quando não se aplicam.
+- ano, nota_tmdb, pagina, total_* são NÚMEROS (sem aspas).
+- nota_tmdb com 1 casa decimal (7.0, 7.9). null quando ausente.
+- total_disponivel = valor de "Mostrando X de Y". Se não houver, igual a total_retornado.
+
+# =====================================================
+# PARTE 2 — DETALHE DO TÍTULO + URL DO PLAYER
+# =====================================================
+Você recebeu uma página de detalhe do site https://megafilmeshd1.com
+(filme, série, dorama ou novela) e deve extrair a ficha do título
+E a(s) URL(s) do player.
+
+Devolva SOMENTE um JSON válido (JSON.parse OK).
+Sem markdown, sem ```json, sem comentários, sem texto fora do JSON.
+
+=====================================================
+A) ENTRADA
+=====================================================
+Request:
+{ "url_pagina": "https://megafilmeshd1.com/filme/maquina-de-guerra-2026" }
+OU
+{ "url_pagina": "https://megafilmeshd1.com/serie/the-walking-dead-2010" }
+
+BASE_URL = https://megafilmeshd1.com
+
+Detecção do tipo pelo 1º segmento da URL:
+  /filme/...   -> tipo = "filme"
+  /serie/...   -> tipo = "serie"
+  /dorama/...  -> tipo = "dorama"   (mesma estrutura de série)
+  /novela/...  -> tipo = "novela"   (mesma estrutura de série)
+
+=====================================================
+B) DADOS DO TÍTULO (COMUM A TODOS OS TIPOS)
+=====================================================
+Extrair do <main class="aw-page">:
+
+  titulo.principal = <h1> principal (decodificar entidades: &#039; -> ')
+  titulo.slug      = 2º segmento da URL
+  titulo.tipo      = "filme" | "serie" | "dorama" | "novela" (da URL)
+  titulo.ano       = ano (inteiro) do <span> em .aw-badges
+  titulo.total_episodios_topo =
+      se existir <span>NNN eps</span> em .aw-badges -> inteiro
+      senão null
+
+  imagens.poster =
+      de .aw-poster img (src="/poster-cache.php?s=w500&p=...")
+      -> BASE_URL + src (decodificar &amp; -> &)
+      Se src="" -> null
+  imagens.backdrop =
+      de --aw-backdrop no <main> (style)
+      OU og:image
+      Se for /poster-cache.php -> prefixar BASE_URL.
+      Se for URL absoluta (image.tmdb.org) -> usar direto.
+      Se ausente -> null
+
+  metricas.nota_tmdb =
+      de .aw-badges .score no formato "★ 7,4"
+      -> converter vírgula para ponto -> número 7.4
+      Se ausente ou 0,0 -> null
+  metricas.votos_tmdb = null (não presente)
+
+  descricao.sinopse = .aw-synopsis (texto limpo, sem HTML, sem <br>)
+  descricao.tagline = null (não presente)
+
+  classificacao.generos =
+      cada <span> dentro de .aw-genre-row -> array de strings
+      (decodificar &amp; -> &)
+  classificacao.duracao       = null
+  classificacao.classificacao = null
+  classificacao.pais_origem   = null
+  classificacao.idioma_original = null
+
+  datas.lancamento =
+      <dt>Lançamento:</dt><dd>DD/MM/YYYY</dd> -> "YYYY-MM-DD"
+      Se ausente -> null
+  datas.fim = null (não presente)
+
+  equipe.diretor =
+      <dt>Direção:</dt><dd>...</dd> -> string ou null
+      (só costuma aparecer em filme; em série é null)
+  equipe.elenco =
+      <dt>Elenco:</dt><dd>A, B, C</dd>
+      -> split(",") + trim em cada item
+      -> [ { "nome": "...", "personagem": null, "foto_url": null } ]
+
+=====================================================
+C) PLAYER — FILME
+=====================================================
+Se tipo == "filme":
+
+  Fonte: <iframe id="awPlayerFrame" src="/player.php?type=filme&tmdb=1265609">
+
+  Decodificar &amp; -> & no src.
+
+  player = {
+    "tipo": "filme",
+    "tmdb_id": inteiro do parâmetro tmdb (ex.: 1265609),
+    "url_embed": BASE_URL + src
+                 (ex.: https://megafilmeshd1.com/player.php?type=filme&tmdb=1265609),
+    "servidores": de .aw-server-list (DUB:/LEG:)
+                  -> [{ "idioma": "DUB", "qualidade": "HD", "ativo": true }]
+  }
+
+  ATENÇÃO:
+   - NÃO usar "var id = 20406" do <script> do rodapé (é view id, não player id).
+   - O parâmetro que importa na URL é "tmdb".
+
+=====================================================
+D) PLAYER — SÉRIE / DORAMA / NOVELA
+=====================================================
+Se tipo == "serie" | "dorama" | "novela":
+
+  Fontes:
+   - #awSeasonSelect (lista <option> das temporadas + contagem)
+   - div.aw-season-group[data-season="N"] com buttons .aw-episode-btn
+
+  Para CADA <div class="aw-season-group" data-season="N">:
+
+    Para CADA <button class="aw-episode-btn">:
+
+      data-src   = "/player.php?type=serie&amp;id=1402&amp;season=1&amp;episode=1"
+                   (decodificar &amp; -> &)
+      data-label = "T01E01 • Dias Passados"
+      <span>     = "01" (número formatado, só para checagem)
+      <b>        = "Dias Passados" (nome do episódio)
+
+      episodio = {
+        "numero": inteiro extraído do parâmetro episode da URL
+                  (ou do <span>; ambos iguais),
+        "nome":   texto do <b>,
+        "label":  data-label,
+        "url_embed": BASE_URL + data-src
+                     (ex.: https://megafilmeshd1.com/player.php?type=serie&id=1402&season=1&episode=1),
+        "servidores": [{ "idioma": "DUB", "qualidade": "HD", "ativo": true }]
+      }
+
+    temporada = {
+      "numero": N (inteiro de data-season),
+      "total_episodios": quantidade de .aw-episode-btn dentro desta temporada,
+      "episodios": [ ... ]  // ordenado por número ascendente
+    }
+
+  player = {
+    "tipo": "serie" (ou "dorama" / "novela"),
+    "serie_id": inteiro do parâmetro "id" dentro das URLs
+                (ex.: 1402),
+    "total_temporadas": length(temporadas),
+    "total_episodios": soma(total_episodios de cada temporada),
+    "temporadas": [ ... ]  // ordenado por "numero" ascendente
+  }
+
+  ATENÇÕES:
+   - NÃO confundir "id=1402" (show id usado pelo player)
+     com "var id = 4411" do <script> do rodapé (view id).
+     Usar SEMPRE o "id" que está dentro de data-src.
+   - Incluir temporadas com `hidden` no HTML — elas existem e são
+     exibidas via JS ao trocar o <select>.
+   - Episódios sempre em ordem ascendente por número.
+   - Cada episódio deve vir com SUA própria url_embed completa.
+
+=====================================================
+E) FORMATO DE SAÍDA (OBRIGATÓRIO)
+=====================================================
+Responder APENAS com este JSON, sem comentários, sem ```json, sem //:
+
+{
+  "meta": {
+    "base_url": "https://megafilmeshd1.com",
+    "url_pagina": "https://megafilmeshd1.com/serie/the-walking-dead-2010",
+    "extraido_em": "2026-10-31T00:00:00Z"
+  },
+  "titulo": {
+    "principal": "The Walking Dead",
+    "slug": "the-walking-dead-2010",
+    "tipo": "serie",
+    "ano": 2010,
+    "total_episodios_topo": 177
+  },
+  "imagens": {
+    "poster": "https://megafilmeshd1.com/poster-cache.php?s=w500&p=9lb02gTh4LLB17yAEXFd4C3R4JP.jpg",
+    "backdrop": "https://megafilmeshd1.com/poster-cache.php?s=w1280&p=rAOjnEFTuNysY7bot8zonhImGMh.jpg"
+  },
+  "metricas": {
+    "nota_tmdb": 8.1,
+    "votos_tmdb": null
+  },
+  "descricao": {
+    "sinopse": "Nos Estados Unidos pós-apocalíptico, um pequeno grupo de sobreviventes segue viajando à procura de uma nova casa longe dos mortos-vivos. O desespero por segurança e suprimentos os coloca constantemente à beira da sanidade.",
+    "tagline": null
+  },
+  "classificacao": {
+    "generos": ["Action & Adventure", "Drama", "Sci-Fi & Fantasy"],
+    "duracao": null,
+    "classificacao": null,
+    "pais_origem": null,
+    "idioma_original": null
+  },
+  "datas": {
+    "lancamento": "2010-10-31",
+    "fim": null
+  },
+  "equipe": {
+    "diretor": null,
+    "elenco": [
+      { "nome": "Lauren Cohan",        "personagem": null, "foto_url": null },
+      { "nome": "Norman Reedus",       "personagem": null, "foto_url": null },
+      { "nome": "Jeffrey Dean Morgan", "personagem": null, "foto_url": null },
+      { "nome": "Melissa McBride",     "personagem": null, "foto_url": null }
+    ]
+  },
+  "player": {
+    "tipo": "serie",
+    "serie_id": 1402,
+    "total_temporadas": 11,
+    "total_episodios": 177,
+    "temporadas": [
+      {
+        "numero": 1,
+        "total_episodios": 6,
+        "episodios": [
+          {
+            "numero": 1,
+            "nome": "Dias Passados",
+            "label": "T01E01 • Dias Passados",
+            "url_embed": "https://megafilmeshd1.com/player.php?type=serie&id=1402&season=1&episode=1",
+            "servidores": [{ "idioma": "DUB", "qualidade": "HD", "ativo": true }]
+          },
+          {
+            "numero": 2,
+            "nome": "Entranhas",
+            "label": "T01E02 • Entranhas",
+            "url_embed": "https://megafilmeshd1.com/player.php?type=serie&id=1402&season=1&episode=2",
+            "servidores": [{ "idioma": "DUB", "qualidade": "HD", "ativo": true }]
+          }
+        ]
+      }
+    ]
+  }
+}
+
+REGRAS FINAIS:
+- JSON válido (JSON.parse OK). Sem ```json, sem //, sem comentários.
+- Se tipo == "filme":
+    player = { "tipo": "filme", "tmdb_id": int, "url_embed": str, "servidores": [...] }
+    NÃO existe player.temporadas.
+- Se tipo == "serie"/"dorama"/"novela":
+    player = { "tipo", "serie_id", "total_temporadas", "total_episodios", "temporadas": [...] }
+    NÃO existe player.tmdb_id.
+- Nota (nota_tmdb) é NÚMERO com ponto (7.4, 8.1). null se ausente.
+- Ano é NÚMERO. null se ausente.
+- Arrays vazios são []. Strings ausentes são null. Nunca "".
+- Não duplicar episódios. Não inventar temporadas ou episódios.
+- URLs sempre com & (não &amp;) depois de decodificar.
+- Se a página não abrir ou der 404:
+    { "meta": { ... }, "erro": "pagina_nao_encontrada" }
+    e nada mais.
+
+Exemplo — Filme (/filme/maquina-de-guerra-2026)
+
+{
+  "meta": {
+    "base_url": "https://megafilmeshd1.com",
+    "url_pagina": "https://megafilmeshd1.com/filme/maquina-de-guerra-2026",
+    "extraido_em": "2026-10-31T00:00:00Z"
+  },
+  "titulo": {
+    "principal": "Máquina de Guerra",
+    "slug": "maquina-de-guerra-2026",
+    "tipo": "filme",
+    "ano": 2026,
+    "total_episodios_topo": null
+  },
+  "imagens": {
+    "poster":   "https://megafilmeshd1.com/poster-cache.php?s=w500&p=5FxJdXQi1kSxmmpcrbJg8iAF8S2.jpg",
+    "backdrop": "https://megafilmeshd1.com/poster-cache.php?s=w1280&p=6yeVcxFR0j08vlv2OlL6zbewm4D.jpg"
+  },
+  "metricas": { "nota_tmdb": 7.4, "votos_tmdb": null },
+  "descricao": {
+    "sinopse": "Na última etapa da seleção para os Rangers, um exercício de treinamento de uma equipe de elite se transforma em uma verdadeira luta pela sobrevivência.",
+    "tagline": null
+  },
+  "classificacao": {
+    "generos": ["Ação", "Ficção científica", "Thriller"],
+    "duracao": null,
+    "classificacao": null,
+    "pais_origem": null,
+    "idioma_original": null
+  },
+  "datas": { "lancamento": "2026-02-12", "fim": null },
+  "equipe": {
+    "diretor": "Patrick Hughes",
+    "elenco": [
+      { "nome": "Alan Ritchson",    "personagem": null, "foto_url": null },
+      { "nome": "Stephan James",    "personagem": null, "foto_url": null },
+      { "nome": "Blake Richardson", "personagem": null, "foto_url": null },
+      { "nome": "Dennis Quaid",     "personagem": null, "foto_url": null }
+    ]
+  },
+  "player": {
+    "tipo": "filme",
+    "tmdb_id": 1265609,
+    "url_embed": "https://megafilmeshd1.com/player.php?type=filme&tmdb=1265609",
+    "servidores": [{ "idioma": "DUB", "qualidade": "HD", "ativo": true }]
+  }
+}
+
+
+
+
+QUANDO ENVIAR UMA URL DE PLAYER PRO ENDERPOINT V2/M3U/player.php?type=filme&tmdb=1265609
+
+
+ele faz o seguinte
+
