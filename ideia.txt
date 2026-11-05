@@ -1,0 +1,24 @@
+A ideia é ja que o dontflix nao devolve o vídeo, 
+a ideia é o dontflix devolver tudo eo vídeo vem de algum desses provedores,
+uns é por pesquisa, outros é com id tmdb
+os players são simples, a ideia é conseguir o vídeo, entt vamos montar o dontflix aumentar ele,
+pega o nome ou id do tmdb que ele retorna, faz a pesquisa, pega o vídeo de algum desses e devolve o vídeo, se precisar de header,
+bom pra cada provedor um tipo de resposta formatada, se precisar de header retorna se nao, nao
+
+teste de cada um, monta o sistema do dontflix
+bom, vc monta o sistema pra pegar o vídeo na ordem da lista
+se quiser criar módulos separados pra cada un, pq cada um tem um jeito de montar o player e devolver o vídeo
+quando 1 nao vai, pula pro próximo, se nao tiver pula pro próximo 
+agora sim vamos ter vídeo do dontflix, ele devolve o bruto eas outras o vídeo pra ele, reproduzir no app
+
+https://redeflixapi.click/
+https://pobreflixtv.business/
+https://megafilmeshd1.com/
+https://vizer.courses/
+https://cineveo.cfd/
+
+ja que você vai estudar 1 a 1, monta o enderpoint certinho, monta tudo, os retro, tentativa, as respostas que vem de cada, monta tudo
+a ideia é uma só, toda essa estrutura por trás 
+e uma chamada normal na api e ela devolve o video, nn precisa mostrar esse sistema por trás 
+a ideia é, chama pro vídeo, pai em cada um, pega o video, seja de ep, ou filme e devolve, rápido,simples prático 
+nao vamos usar os vídeos do próprio dontflix, nn da pra pegar
